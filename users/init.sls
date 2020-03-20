@@ -67,7 +67,7 @@ include:
 {%- endif -%}
 {%- set current = salt.user.info(name) -%}
 {%- set home = user.get('home', current.get('home', "/home/%s" % name)) -%}
-{%- set createhome = user.get('createhome') -%}
+{%- set createhome = user.get('createhome', users.get('createhome')) -%}
 
 {%- if 'prime_group' in user and 'name' in user['prime_group'] %}
 {%- set user_group = user.prime_group.name -%}
@@ -144,7 +144,7 @@ users_{{ name }}_user:
     {% elif 'prime_group' in user and 'name' in user['prime_group'] %}
     - gid: {{ user['prime_group']['name'] }}
     {% else -%}
-    - gid_from_name: True
+    - gid: {{ name }}
     {% endif -%}
     {% if 'fullname' in user %}
     - fullname: {{ user['fullname'] }}
@@ -173,7 +173,7 @@ users_{{ name }}_user:
         {% elif grains['kernel'] == 'Linux' and
             user['expire'] > 84006 %}
         {# 2932896 days since epoch equals 9999-12-31 #}
-    - expire: {{ (user['expire'] / 86400) | int}}
+    - expire: {{ (user['expire'] / 86400) | int }}
         {% else %}
     - expire: {{ user['expire'] }}
         {% endif %}
@@ -199,7 +199,7 @@ users_{{ name }}_user:
     {% if 'optional_groups' in user %}
     - optional_groups:
       {% for optional_group in user['optional_groups'] -%}
-      - {{optional_group}}
+      - {{ optional_group }}
       {% endfor %}
     {% endif %}
     - require:
@@ -506,8 +506,9 @@ users_{{ users.sudoers_dir }}/{{ sudoers_d_filename }}:
     - name: {{ users.sudoers_dir }}/{{ sudoers_d_filename }}
 {% endif %}
 
-{%- if 'google_auth' in user %}
-{%- for svc in user['google_auth'] %}
+{%- if not grains['os_family'] in ['RedHat', 'Suse'] %}
+{%-   if 'google_auth' in user %}
+{%-     for svc in user['google_auth'] %}
 users_googleauth-{{ svc }}-{{ name }}:
   file.managed:
     - replace: false
@@ -518,7 +519,8 @@ users_googleauth-{{ svc }}-{{ name }}:
     - mode: 400
     - require:
       - pkg: users_googleauth-package
-{%- endfor %}
+{%-     endfor %}
+{%-   endif %}
 {%- endif %}
 
 # this doesn't work (Salt bug), therefore need to run state.apply twice
